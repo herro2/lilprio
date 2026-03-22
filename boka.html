@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LiL Prio - Demo Digital Triage</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+    <div class="header-left">
+        <div class="menu-container">
+            <button class="dots-button" onclick="toggleMenu()" id="menuBtn">
+                <span></span><span></span><span></span>
+            </button>
+            <ul class="dropdown-content" id="dropdownMenu">
+                <li><a href="index.html">Hem</a></li>
+                <li><a href="index.html#strategi">Vår strategi</a></li>
+                <li><a href="teamet.html">Grundare</a></li>
+            </ul>
+        </div>
+        <div class="logo">LiL Prio <span>Demo</span></div>
+    </div>
+    <a href="index.html" class="nav-cta">Till startsidan</a>
+</header>
+
+<main class="demo-main">
+
+    <!-- ── Chatt-panel ── -->
+    <div class="chat-container">
+
+        <div class="chat-messages" id="chat-box">
+            <div class="message ai">Välj dina symptom nedan, så bedömer jag ditt ärende och placerar dig i kön.</div>
+        </div>
+
+        <div id="loading-indicator" class="loading">
+            <div class="loading-dot"></div>
+            <div class="loading-dot"></div>
+            <div class="loading-dot"></div>
+        </div>
+
+        <!-- Symptom-väljaren (visas i steg 1) -->
+        <div class="symptom-picker" id="symptom-picker">
+            <span class="symptom-picker-label">Välj det som stämmer in på dig</span>
+            <div class="symptom-chips" id="chip-container"></div>
+            <div class="picker-footer">
+                <input type="text" id="extra-input" placeholder="Övrigt (valfritt)…">
+                <button id="send-btn" disabled>Skicka</button>
+            </div>
+        </div>
+
+        <!-- Fritext för följdfrågor (visas efter AI svarat) -->
+        <div class="followup-input-area" id="followup-area">
+            <input type="text" id="followup-input" placeholder="Skriv ditt svar…" autocomplete="off">
+            <button id="followup-btn">Svara</button>
+        </div>
+
+    </div>
+
+    <!-- ── Kö-panel ── -->
+    <div class="queue-container hidden" id="queue-container">
+        <span class="queue-title" id="queue-title">Digital Väntelista</span>
+        <div class="queue-scroll-box" id="queue-scroll-box">
+            <ul id="queue-list" class="queue-list"></ul>
+        </div>
+    </div>
+
+</main>
+
+<script>
+    const GROQ_PROXY = "/.netlify/functions/groq";
+
+    // ── Symptom-chips ────────────────────────────────────────────────────────
+    const CHIPS = [
+        "Bröstsmärta / tryck",
+        "Andnöd",
+        "Feber",
+        "Huvudvärk",
+        "Nackstelhet",
+        "Buksmärta",
+        "Illamående / kräkningar",
+        "Yrsel",
+        "Svimningskänsla",
+        "Ryggsmärta",
+        "Skada / fall",
+        "Blödning",
+        "Hudutslag",
+        "Hosta",
+        "Halsont",
+        "Urinproblem",
+        "Domningar / stickningar",
+        "Svaghet i arm eller ben",
+        "Synproblem",
+        "Talsvårigheter",
+    ];
+
+    // ── Pre-genererade kö-patienter – unika symptom, sorteras av AI ─────────
+    const symptomPool = [
+        "Bröstsmärta med utstrålning till vänster arm",
+        "Plötslig ansiktsförlamning höger sida",
+        "Hög feber och stelhet i nacken",
+        "Öppen fraktur på underben efter fall",
+        "Kraftig blödning från djupt sår i hand",
+        "Akut och tilltagande buksmärta",
+        "Misstänkt hjärnskakning efter kollision",
+        "Halsfluss med feber 39°C",
+        "Sveda vid urinering sedan tre dagar",
+        "Lättare stukning av vänster fotled",
+        "Hosta och snuva sedan en vecka",
+        "Allergisk reaktion med svullna läppar",
+        "Ryggsmärta efter tungt lyft på jobbet",
+        "Pulserade migrän med ljuskänslighet",
+        "Barn 4 år med feber 38.8°C",
+        "Knäsmärta efter löpning, svullet knä",
+        "Andnöd som förvärrats under dagen",
+        "Yrsel och illamående utan feber",
+        "Brännsår på underarm grad 2",
+        "Svullnad och värmeökning i vaden",
+        "Öronvärk med nedsatt hörsel",
+        "Plötslig synförsämring på ett öga",
+        "Kramper i benet, varade 2 minuter",
+        "Magsmärta efter måltid, uppstötningar",
+        "Skärsår på finger, blödning svårstopp",
+        "Andnöd vid ansträngning, tryck i bröstet",
+        "Utslag över hela bålen med klåda",
+        "Axelsmärta efter sportskada",
+        "Svullna leder i händerna på morgonen",
+        "Huvudvärk bakom ögonen, nackstel",
+        "Feber 40°C och frossa sedan igår",
+        "Domningar i båda fötterna",
+        "Blod i urinen utan smärta",
+        "Plötslig svaghet i höger arm och ben",
+        "Magsmärta nedre höger sida, tilltar",
+        "Bröstsmärta vid djup andetag",
+        "Hosta med blodtillblandad slem",
+        "Svimning utan förvarning inomhus",
+        "Tandvärk med svullnad i käken",
+        "Klämskada på hand, misstänkt fraktur",
+        "Barn 2 år sväljde okänt föremål",
+        "Psykisk kris, ångest och panik",
+        "Skadad knäled, kan ej belasta benet",
+        "Ryggsmärta med utstrålning till fot",
+        "Feber hos äldre person, förvirring"
+    ];
+
+    const dynamicQueue = symptomPool.map((desc, i) => ({
+        id:          `P-${i}`,
+        description: desc,
+        prio:        null
+    }));
+
+    // ── State ────────────────────────────────────────────────────────────────
+    let userEntry           = null;
+    let conversationHistory = [];
+    let queueRanked         = false;
+    let isLoading           = false;
+    let openSymptoms        = new Set();
+    let selectedChips       = new Set();
+    let firstMessageSent    = false;
+
+    // ── Bygg chip-väljaren ───────────────────────────────────────────────────
+    function buildChips() {
+        const container = document.getElementById('chip-container');
+        CHIPS.forEach(label => {
+            const btn = document.createElement('button');
+            btn.className   = 'chip';
+            btn.textContent = label;
+            btn.addEventListener('click', () => toggleChip(btn, label));
+            container.appendChild(btn);
+        });
+    }
+
+    function toggleChip(btn, label) {
+        if (selectedChips.has(label)) {
+            selectedChips.delete(label);
+            btn.classList.remove('selected');
+        } else {
+            selectedChips.add(label);
+            btn.classList.add('selected');
+        }
+        document.getElementById('send-btn').disabled =
+            selectedChips.size === 0 && !document.getElementById('extra-input').value.trim();
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        buildChips();
+        document.getElementById('extra-input').addEventListener('input', () => {
+            document.getElementById('send-btn').disabled =
+                selectedChips.size === 0 && !document.getElementById('extra-input').value.trim();
+        });
+    });
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+    function prioClass(p) {
+        if (p >= 70) return "prio-high";
+        if (p >= 35) return "prio-medium";
+        return "prio-low";
+    }
+
+    function setLoading(state) {
+        isLoading = state;
+        document.getElementById('loading-indicator').classList.toggle('active', state);
+        document.getElementById('send-btn').disabled     = state;
+        document.getElementById('followup-btn').disabled = state;
+        document.getElementById('followup-input').disabled = state;
+    }
+
+    // ── Rendera kön ──────────────────────────────────────────────────────────
+    function renderQueue() {
+        if (!userEntry) return;
+        const cont  = document.getElementById('queue-container');
+        const title = document.getElementById('queue-title');
+        const list  = document.getElementById('queue-list');
+
+        if (cont.classList.contains('hidden')) {
+            cont.classList.replace('hidden', 'visible');
+        }
+
+        const all = [...dynamicQueue, userEntry]
+            .sort((a, b) => (b.prio ?? -1) - (a.prio ?? -1));
+
+        const userIdx = all.findIndex(p => p.id === "DU");
+        title.innerHTML =
+            `Väntelista &nbsp;·&nbsp; ${all.length} patienter &nbsp;·&nbsp; ` +
+            `<strong style="color:var(--blue)">Din plats: ${userIdx + 1}</strong>`;
+
+        list.innerHTML = '';
+        all.forEach((p, idx) => {
+            const isUser = p.id === "DU";
+            const uid    = `sym-${p.id}`;
+            const pc     = p.prio !== null ? prioClass(p.prio) : "prio-pending";
+            const label  = p.prio !== null ? `Prio ${p.prio}` : "Beräknas…";
+            const isOpen = openSymptoms.has(uid);
+
+            const li = document.createElement('li');
+            li.className = `queue-item${isUser ? " user-highlight" : ""}`;
+            li.innerHTML = `
+                <div class="queue-item-row">
+                    <span class="queue-item-label">
+                        ${idx + 1}. ${isUser ? "🔵 Du" : `Patient #${p.id.replace("P-","")}`}
+                    </span>
+                    <div class="queue-item-actions">
+                        <span class="prio-tag ${pc}">${label}</span>
+                        <button class="toggle-symptom-btn" onclick="toggleSymptom('${uid}',this)">
+                            ${isOpen ? "Dölj" : "Visa"}
+                        </button>
+                    </div>
+                </div>
+                <div class="symptom-reveal${isOpen ? " open" : ""}" id="${uid}">${p.description}</div>
+            `;
+            list.appendChild(li);
+        });
+
+        // Scrolla till din rad
+        setTimeout(() => {
+            const el = list.children[userIdx];
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }, 80);
+    }
+
+    function toggleSymptom(uid, btn) {
+        const el   = document.getElementById(uid);
+        const open = el.classList.toggle('open');
+        open ? openSymptoms.add(uid) : openSymptoms.delete(uid);
+        btn.textContent = open ? "Dölj" : "Visa";
+    }
+
+    // ── API: ranka kö-patienter ──────────────────────────────────────────────
+    async function rankPreGeneratedPatients() {
+        try {
+            const res = await fetch(GROQ_PROXY, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    model: "llama-3.3-70b-versatile",
+                    temperature: 0.3,
+                    messages: [
+                        {
+                            role: "system",
+                            content:
+                                "Du är medicinsk triage-expert. Lista patienter med format \"ID: symptom\".\n" +
+                                "Ge varje patient prioritet 1–100. Svara BARA med JSON:\n" +
+                                "{\"rankings\":[{\"id\":\"P-0\",\"prio\":85}]}"
+                        },
+                        { role: "user", content: dynamicQueue.map(p => `${p.id}: ${p.description}`).join("\n") }
+                    ]
+                })
+            });
+            const data   = await res.json();
+            const parsed = JSON.parse(data.choices[0].message.content.trim().replace(/```json|```/g, ""));
+            parsed.rankings.forEach(r => {
+                const p = dynamicQueue.find(q => q.id === r.id);
+                if (p) p.prio = r.prio;
+            });
+        } catch {
+            dynamicQueue.forEach(p => { if (!p.prio) p.prio = Math.floor(Math.random() * 85) + 5; });
+        }
+    }
+
+    // ── API: triagera användaren ─────────────────────────────────────────────
+    async function triageUser(userText) {
+        conversationHistory.push({ role: "user", content: userText });
+
+        const res = await fetch(GROQ_PROXY, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                model: "llama-3.3-70b-versatile",
+                messages: [
+                    {
+                        role: "system",
+                        content:
+                            "Du är medicinsk triage-expert. Svara KORT – max 3–4 meningar totalt.\n\n" +
+                            "Struktur:\n" +
+                            "1. En mening om vad det kan bero på.\n" +
+                            "2. Max 1–2 följdfrågor om du behöver mer info (annars hoppa över).\n" +
+                            "3. En konkret rekommendation: 'Ring 112' / 'Åk till akuten' / 'Kontakta närakut' / 'Ring 1177'.\n\n" +
+                            "När du är ~90% säker, avsluta med 'PRIO: [1-100]'. " +
+                            "Vid röda flaggor (bröstsmärta, stroke, meningit): ge PRIO direkt.\n\n" +
+                            "Skriv på svenska. Inga rubriker, inga punktlistor."
+                    },
+                    ...conversationHistory
+                ]
+            })
+        });
+
+        const data  = await res.json();
+        const reply = data.choices[0].message.content;
+        conversationHistory.push({ role: "assistant", content: reply });
+
+        const match = reply.match(/PRIO:\s*(\d+)/);
+        return {
+            reply: reply.replace(/PRIO:\s*\d+/g, "").trim(),
+            prio:  match ? parseInt(match[1]) : null
+        };
+    }
+
+    // ── Skicka första meddelandet (chips) ────────────────────────────────────
+    async function sendInitial() {
+        if (isLoading) return;
+
+        const extra = document.getElementById('extra-input').value.trim();
+        const parts = [...selectedChips];
+        if (extra) parts.push(extra);
+        if (parts.length === 0) return;
+
+        const text = parts.join(", ");
+
+        // Visa valt som bubbla
+        appendMsg(text, 'user');
+
+        // Byt UI: dölj picker, visa följdfråge-input
+        document.getElementById('symptom-picker').style.display = 'none';
+        document.getElementById('followup-area').classList.add('active');
+        firstMessageSent = true;
+
+        setLoading(true);
+        try {
+            const [triage] = await Promise.all([
+                triageUser(text),
+                rankPreGeneratedPatients()
+            ]);
+            queueRanked = true;
+            handleTriageResult(triage, text);
+        } catch {
+            appendMsg("Kunde inte ansluta. Kontrollera din API-nyckel.", "ai");
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    // ── Skicka följdfråge-svar ───────────────────────────────────────────────
+    async function sendFollowup() {
+        if (isLoading) return;
+        const inp  = document.getElementById('followup-input');
+        const text = inp.value.trim();
+        if (!text) return;
+
+        appendMsg(text, 'user');
+        inp.value = '';
+        setLoading(true);
+
+        try {
+            const triage = await triageUser(text);
+            handleTriageResult(triage, text);
+        } catch {
+            appendMsg("Något gick fel. Försök igen.", "ai");
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    // ── Hantera triage-svar ──────────────────────────────────────────────────
+    function handleTriageResult(triage, rawText) {
+        appendMsg(triage.reply, 'ai');
+
+        if (triage.prio !== null) {
+            const allUserText = conversationHistory
+                .filter(m => m.role === "user")
+                .map(m => m.content)
+                .join(" · ");
+
+            if (userEntry) {
+                userEntry.prio        = triage.prio;
+                userEntry.description = allUserText;
+            } else {
+                userEntry = { id: "DU", description: allUserText, prio: triage.prio };
+            }
+            renderQueue();
+        }
+    }
+
+    // ── Lägg till bubbla ─────────────────────────────────────────────────────
+    function appendMsg(text, sender) {
+        const box = document.getElementById('chat-box');
+        const div = document.createElement('div');
+        div.className = `message ${sender}`;
+        div.innerText = text;
+        box.appendChild(div);
+        box.scrollTop = box.scrollHeight;
+    }
+
+    // ── Event-lyssnare ───────────────────────────────────────────────────────
+    document.getElementById('send-btn').addEventListener('click', sendInitial);
+    document.getElementById('followup-btn').addEventListener('click', sendFollowup);
+    document.getElementById('followup-input').addEventListener('keypress', e => {
+        if (e.key === 'Enter') sendFollowup();
+    });
+    // ── Kebab-meny ────────────────────────────────────────────────────────────
+    function toggleMenu() {
+        document.getElementById('dropdownMenu').classList.toggle('show');
+    }
+    document.addEventListener('click', e => {
+        if (!document.getElementById('menuBtn').contains(e.target)) {
+            document.getElementById('dropdownMenu').classList.remove('show');
+        }
+    });
+</script>
+</body>
+</html>
