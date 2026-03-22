@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LiL Prio</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+    <div class="header-left">
+        <div class="menu-container">
+            <button class="dots-button" onclick="toggleMenu()" id="menuBtn">
+                <span></span><span></span><span></span>
+            </button>
+            <ul class="dropdown-content" id="dropdownMenu">
+                <li><a href="index.html">Hem</a></li>
+                <li><a href="#strategi">Vår strategi</a></li>
+                <li><a href="teamet.html">Grundare</a></li>
+                <li><a href="boka.html">Prova demo</a></li>
+            </ul>
+        </div>
+        <div class="logo">LiL <span>Prio</span></div>
+    </div>
+    <a href="boka.html" class="nav-cta">Prova demo →</a>
+</header>
+
+<!-- Hero -->
+<section class="hero-medical">
+    <div>
+        <p class="badge">Digital Triage · Sverige</p>
+        <h1>Rätt vård.<br>Rätt tid.</h1>
+        <p class="slogan">LiL Prio är ett AI-drivet triagesystem som prioriterar patienter i realtid — innan de ens sätter sin fot i väntrummet.</p>
+        <a href="boka.html" class="nav-cta" style="display:inline-block; margin-top: 32px; font-size: 15px; padding: 10px 24px;">Prova demo →</a>
+    </div>
+</section>
+
+<!-- Strategi -->
+<section class="container" id="strategi">
+    <p class="badge">Hur det fungerar</p>
+    <h2>Vår strategi</h2>
+    <div class="function-grid">
+        <div class="func-card">
+            <h3>🩺 Digital triage</h3>
+            <p style="color:#86868b; line-height:1.7">Patienten beskriver sina symptom via en digital interface innan besöket. AI:n analyserar och tilldelar en prioritet i realtid.</p>
+        </div>
+        <div class="func-card">
+            <h3>⚡ Realtidsrankning</h3>
+            <p style="color:#86868b; line-height:1.7">Kön sorteras automatiskt efter medicinsk allvarlighetsgrad — inte efter vem som kom först. Akuta fall lyfts direkt.</p>
+        </div>
+        <div class="func-card">
+            <h3>🏥 Integrerat system</h3>
+            <p style="color:#86868b; line-height:1.7">LiL Prio kopplas till befintliga journalsystem och ger vårdpersonal ett tydligt beslutsunderlag redan innan patienten anländer.</p>
+        </div>
+    </div>
+</section>
+
+<!-- CTA-sektion -->
+<section style="background:#0a0a0a; border-top:1px solid rgba(255,255,255,0.07); border-bottom:1px solid rgba(255,255,255,0.07);">
+    <div class="container" style="text-align:center; padding: 80px 20px;">
+        <p class="badge">Demo</p>
+        <h2 style="margin-bottom:16px">Se systemet i aktion</h2>
+        <p style="color:#86868b; font-size:1rem; max-width:500px; margin:0 auto 32px">Testa vår digitala triageDemo och se hur AI:n placerar dig i kön baserat på dina symptom.</p>
+        <a href="boka.html" class="nav-cta" style="display:inline-block; font-size:15px; padding:12px 28px;">Starta demo →</a>
+    </div>
+</section>
+
+<footer>
+    <p>© 2025 LiL Prio · Ett skolprojekt</p>
+</footer>
+
+<script>
+    function toggleMenu() {
+        document.getElementById('dropdownMenu').classList.toggle('show');
+    }
+    document.addEventListener('click', e => {
+        if (!document.getElementById('menuBtn').contains(e.target)) {
+            document.getElementById('dropdownMenu').classList.remove('show');
+        }
+    });
+</script>
+
+</body>
+</html>
